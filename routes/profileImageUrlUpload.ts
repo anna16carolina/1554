@@ -14,10 +14,34 @@ import * as utils from '../lib/utils'
 import logger from '../lib/logger'
 
 export function profileImageUrlUpload () {
+  // List of trusted image host domains
+  const TRUSTED_IMAGE_HOSTS = [
+    'images.unsplash.com',
+    'cdn.pixabay.com',
+    'i.imgur.com',
+    'imgur.com',
+    'cloudinary.com',
+    // add more trusted domains as needed
+  ]
   return async (req: Request, res: Response, next: NextFunction) => {
     if (req.body.imageUrl !== undefined) {
       const url = req.body.imageUrl
       if (url.match(/(.)*solve\/challenges\/server-side(.)*/) !== null) req.app.locals.abused_ssrf_bug = true
+      let parsedUrl
+      try {
+        parsedUrl = new URL(url)
+      } catch (error) {
+        next(new Error('Invalid image URL'))
+        return
+      }
+      // Check scheme is https and host is in allow-list
+      if (
+        parsedUrl.protocol !== 'https:' ||
+        !TRUSTED_IMAGE_HOSTS.includes(parsedUrl.hostname)
+      ) {
+        next(new Error('Image URL must be HTTPS and from a trusted host'))
+        return
+      }
       const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
       if (loggedInUser) {
         try {
